@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import hashlib
 import json
 import os
@@ -262,6 +261,8 @@ def setup_lock(operation: str) -> Generator[None]:
     if operation != "setup":
         yield
         return
+    import fcntl
+
     directory = ROOT / "var/setup"
     directory.mkdir(parents=True, exist_ok=True)
     with (directory / "setup.lock").open("a") as handle:
