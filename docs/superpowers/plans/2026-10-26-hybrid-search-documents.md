@@ -98,10 +98,12 @@
 
 **Interfaces:** `RankedCandidate` 包含 Passage、dense_score/dense_rank、bm25_score/bm25_rank、rrf_score；`fuse_rrf(dense: list[Passage], lexical: list[LexicalHit], rank_constant: int = 60) -> list[RankedCandidate]`。
 
-- [ ] 手算测试 dense=[A,B]、bm25=[B,C]：B=1/62+1/61，A=1/61，C=1/62，排序 B>A>C。
-- [ ] 测试一路为空、双路为空、同一路重复项只记一次、不同集合候选拒绝混合；同分按 doc_id/chunk_no 稳定排序。
-- [ ] 实现并执行 `<PY> -m pytest backend/tests/core/test_rrf.py -q`。
-- [ ] 真实运行 rrf：记录两路 Top-50、并集和融合 Top-30，逐题计算融合截断丢失的相关证据。
+- [x] 手算测试 dense=[A,B]、bm25=[B,C]：B=1/62+1/61，A=1/61，C=1/62，排序 B>A>C。
+- [x] 测试一路为空、双路为空、同一路重复项只记一次、不同集合候选拒绝混合；同分按 doc_id/chunk_no 稳定排序。
+- [x] 实现并执行 `<PY> -m pytest backend/tests/core/test_rrf.py -q`。
+- [x] 真实运行 rrf：记录两路 Top-50、并集和融合 Top-30；已标注样例报告锚点的召回/截断损失，未标注样例保持未知，不宣称全量证据覆盖。
+
+步骤 3 验证记录见 `2026-10-26-rrf-verification.md`。同路去重后重新编号，首次命中的原分数被保留；融合函数返回完整列表，由调用方截取 Top-N。实际验收使用 2 个历史真实查询向量和真实只读知识集合，没有生成新向量。
 
 **通过标准：** 算法测试全过；报告可定位每个证据在哪一路命中、是否被融合截断。此时不要求虚构 RRF 必然优于 dense。**提交：** `feat: add traceable RRF fusion`。
 

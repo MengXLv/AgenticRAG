@@ -1,4 +1,4 @@
-"""混合检索新增的词法能力；不扩展原有向量检索协议。"""
+"""混合检索的词法能力与融合候选；不扩展原有向量检索协议。"""
 
 from dataclasses import dataclass
 from typing import Protocol
@@ -12,6 +12,18 @@ class LexicalHit:
 
     passage: Passage
     score: float
+
+
+@dataclass(frozen=True)
+class RankedCandidate:
+    """融合候选保留两路的首次有效排名；缺席一路用 None 表示。"""
+
+    passage: Passage
+    dense_score: float | None = None
+    dense_rank: int | None = None
+    bm25_score: float | None = None
+    bm25_rank: int | None = None
+    rrf_score: float = 0.0
 
 
 class PassageSourceReader(Protocol):
