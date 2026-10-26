@@ -113,11 +113,13 @@
 
 **Interfaces:** `RerankHit(candidate_index: int, score: float)`；`Reranker.rank(query: str, passages: list[Passage]) -> Awaitable[list[RerankHit]]`；`HybridHit(passage: Passage, ranking: HybridRanking)`；`HybridSearchResult(hits: list[HybridHit])`；`HybridKnowledgeClient.search(collection_id: str, query: str, limit: int = 5) -> Awaitable[HybridSearchResult]`。
 
-- [ ] 使用屏障式假检索器验证两路确实重叠执行，不用脆弱的固定 sleep 时间判断；仅向量侧收到 Qwen 指令前缀。
-- [ ] 使用可控假重排器验证 RRF 30 条上限、按重排分数返回最终 limit 条；零候选时不调用重排；同分稳定排序。
-- [ ] 测试重排候选索引越界、重复、遗漏及非有限分数必须报错；不能把外部响应错配到原文。
-- [ ] 验证失败或取消时另一分支被取消并等待回收；记录 hybrid.request/response/error/canceled，并分开记录每路、融合、重排的排名与耗时。
-- [ ] 断言输入 Passage 和旧工具返回分数未被修改，HybridRanking 独立保存；执行 `<PY> -m pytest backend/tests/core/test_hybrid_knowledge.py -q`。
+- [x] 使用屏障式假检索器验证两路确实重叠执行，不用脆弱的固定 sleep 时间判断；仅向量侧收到 Qwen 指令前缀。
+- [x] 使用可控假重排器验证 RRF 30 条上限、按重排分数返回最终 limit 条；零候选时不调用重排；同分稳定排序。
+- [x] 测试重排候选索引越界、重复、遗漏及非有限分数必须报错；不能把外部响应错配到原文。
+- [x] 验证失败或取消时另一分支被取消并等待回收；记录 hybrid.request/response/error/canceled，并分开记录每路、融合、重排的排名与耗时。
+- [x] 断言输入 Passage 和旧工具返回分数未被修改，HybridRanking 独立保存；执行 `<PY> -m pytest backend/tests/core/test_hybrid_knowledge.py -q`。
+
+步骤 4 验证记录见 `2026-10-26-hybrid-coordination-verification.md`。默认全流程超时 30 秒；取消/超时后等待同步读库结束可能超过此值，它不是强制杀线程的硬截止时间。真实 Cross-Encoder 尚未接入。
 
 **通过标准：** 假依赖能证明完整链路、身份映射和异常生命周期正确；明确尚未证明真实重排质量。**提交：** `feat: orchestrate hybrid retrieval with ranking provenance`。
 

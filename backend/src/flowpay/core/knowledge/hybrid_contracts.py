@@ -26,6 +26,43 @@ class RankedCandidate:
     rrf_score: float = 0.0
 
 
+@dataclass(frozen=True)
+class RerankHit:
+    candidate_index: int
+    score: float
+
+
+class Reranker(Protocol):
+    async def rank(self, query: str, passages: list[Passage]) -> list[RerankHit]: ...
+
+
+class DenseRetriever(Protocol):
+    """取消返回之前须回收其拥有的工作；现有 KnowledgeClient 由协调层安全适配。"""
+
+    async def search(self, collection_id: str, text: str, limit: int = 5) -> list[Passage]: ...
+
+
+@dataclass(frozen=True)
+class HybridRanking:
+    dense_score: float | None
+    dense_rank: int | None
+    bm25_score: float | None
+    bm25_rank: int | None
+    rrf_score: float
+    rerank_score: float
+
+
+@dataclass(frozen=True)
+class HybridHit:
+    passage: Passage
+    ranking: HybridRanking
+
+
+@dataclass(frozen=True)
+class HybridSearchResult:
+    hits: list[HybridHit]
+
+
 class PassageSourceReader(Protocol):
     """仅从已就绪的不可变集合读取索引素材。"""
 

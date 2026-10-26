@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 
 from flowpay.core.event_log.contracts import EventSink
 from flowpay.core.event_log.store import new_id
@@ -20,6 +21,12 @@ class KnowledgeClient:
         self.store: VectorStore = store
         self.embeddings: EmbeddingClient = embeddings
         self.tracer: EventSink = tracer
+
+    async def _call_store[**P, T](
+        self, operation: Callable[P, T], *args: P.args, **kwargs: P.kwargs
+    ) -> T:
+        """默认沿用直接线程调用；混合检索适配器可加强取消时的回收边界。"""
+        return await asyncio.to_thread(operation, *args, **kwargs)
 
     # 已成功入库的批次不会重算；外部请求成功但入库失败的批次重试时可能再次请求。
     async def embed_pending(self, collection_id: str) -> int:
@@ -76,7 +83,7 @@ class KnowledgeClient:
             call_id,
         )
         try:
-            collection = await asyncio.to_thread(self.store.get_collection, collection_id)
+            collection = await self._call_store(self.store.get_collection, collection_id)
             if collection["status"] != "ready":
                 raise ValueError("Collection is not ready")
             if not same_vector_space(
@@ -90,9 +97,7 @@ class KnowledgeClient:
             # 查询文本和文档分块必须处于同一向量空间；前面已核对完整模型身份。
             # 这里不会自动改写问题或拼接业务提示，那些策略由 workflows 决定。
             batch = await self.embeddings.embed([text])
-            result = await asyncio.to_thread(
-                self.store.search, collection_id, batch, limit, filters
-            )
+            result = await self._call_store(self.store.search, collection_id, batch, limit, filters)
             # 事件载荷保留完整溯源；只有交给模型的那一份会被投影成四个字段。
             await self.tracer.emit(
                 "knowledge.response",
