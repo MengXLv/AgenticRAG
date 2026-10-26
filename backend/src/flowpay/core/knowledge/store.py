@@ -299,6 +299,21 @@ class PostgresVectorStore:
             ).fetchall()
             return [_passage(row) for row in rows]
 
+    def list_passages(self, collection_id: str) -> list[Passage]:
+        """读取已就绪集合全部片段，供词法索引构建；不加载向量、不计算分数。"""
+        with self.pool.connection() as db:
+            collection = self._read_collection(db, collection_id)
+            if collection["status"] != "ready":
+                raise ValueError("Collection is not ready")
+            rows = db.execute(
+                "SELECT c.collection_id,c.doc_id,c.chunk_no,c.content,c.source_locator,"
+                + "d.title,d.source_path,d.source_sha256,d.metadata "
+                + "FROM chunks c JOIN documents d USING(collection_id,doc_id) "
+                + "WHERE c.collection_id=%s ORDER BY c.doc_id,c.chunk_no",
+                (collection_id,),
+            ).fetchall()
+            return [_passage(row, score=0.0) for row in rows]
+
     # 整篇读回只按文档编号排序，不重新计算相似度：这是"读完这一篇"，不是检索。
     def read_document(self, collection_id: str, doc_id: str) -> list[Passage]:
         """按文档编号返回它的全部分块，按块号排序；文档不存在时返回空列表。

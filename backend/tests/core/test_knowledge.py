@@ -19,7 +19,7 @@ from flowpay.core.json import (
 )
 from flowpay.core.knowledge import Chunk, Document, PostgresVectorStore
 from flowpay.core.knowledge.client import KnowledgeClient
-from flowpay.core.llm.embedding import EmbeddingClient, EmbeddingSettings
+from flowpay.core.llm.embedding import EmbeddedBatch, EmbeddingClient, EmbeddingSettings, text_hash
 from flowpay.core.llm.embedding.openai_embedding import OpenAiEmbeddingModel
 
 pytestmark = pytest.mark.skipif(not os.getenv("FLOWPAY_TEST_POSTGRES"), reason="Opt-in PostgreSQL")
@@ -50,6 +50,56 @@ def collection(store: PostgresVectorStore, settings: EmbeddingSettings):
     store.create_collection(cid, "fixture", "a" * 64, config, settings.dimensions)
     store.create_collection(cid, "fixture", "a" * 64, config, settings.dimensions)
     return cid
+
+
+def test_list_passages_is_ready_only_ordered_scoped_and_preserves_sources(
+    stores: tuple[PostgresVectorStore, PostgresVectorStore],
+) -> None:
+    from flowpay.core.knowledge.lexical import BM25Retriever
+
+    builder, reader = stores
+    settings = model_settings()
+    cid, other = collection(builder, settings), collection(builder, settings)
+    with pytest.raises(ValueError, match="not ready"):
+        reader.list_passages(cid)
+    for scope in (cid, other):
+        for name in ("B", "A"):
+            chunks = [Chunk(1, "HTTP 410", {"section": "状态"}), Chunk(2, "account_id")]
+            builder.save_document(
+                scope,
+                Document(name, name, f"{name}.md", "HTTP 410 account_id", {"kind": name}),
+                chunks,
+            )
+            builder.save_embeddings(
+                scope,
+                [(name, chunk.chunk_no) for chunk in chunks],
+                EmbeddedBatch(
+                    settings.identity(),
+                    [text_hash(c.content) for c in chunks],
+                    [[1.0, 0.0, 0.0] for _ in chunks],
+                    [],
+                ),
+            )
+        builder.mark_ready(scope, {"A": 2, "B": 2})
+    rows = reader.list_passages(cid)
+    assert [(p.source.doc_id, p.source.chunk_no) for p in rows] == [
+        ("A", 1),
+        ("A", 2),
+        ("B", 1),
+        ("B", 2),
+    ]
+    assert all(p.source.collection_id == cid and p.score == 0.0 for p in rows)
+    assert rows[0].source.metadata == {"kind": "A"}
+    assert rows[0].source.locator == {"section": "状态"}
+    assert rows[0].source.path == "A.md"
+    retriever = BM25Retriever(reader)
+    assert [h.passage.source.doc_id for h in retriever.search(cid, "HTTP 410")] == ["A", "B"]
+    assert all(
+        h.passage.source.collection_id == other for h in retriever.search(other, "account_id")
+    )
+    assert retriever.search(cid, "FP-9999") == []
+    with pytest.raises(KeyError):
+        reader.list_passages("missing-collection")
 
 
 async def test_build_resume_query_and_historical_evidence(
