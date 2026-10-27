@@ -15,14 +15,13 @@ from .fusion import fuse_rrf
 from .hybrid_contracts import (
     DenseRetriever,
     HybridHit,
-    HybridRanking,
     HybridSearchResult,
     LexicalHit,
     LexicalRetriever,
     RankedCandidate,
     Reranker,
-    RerankHit,
 )
+from .ranking import DEFAULT_LIMIT, DEFAULT_RERANK_WEIGHT, rank_candidates, validate_weight
 
 
 async def _drain[T](task: asyncio.Future[T]) -> None:
@@ -66,6 +65,7 @@ class HybridKnowledgeClient:
         rerank_limit: int = 30,
         rank_constant: int = 60,
         timeout_seconds: float = 30,
+        rerank_weight: float = DEFAULT_RERANK_WEIGHT,
     ) -> None:
         if type(recall_limit) is not int or not 1 <= recall_limit <= 100:
             raise ValueError("recall_limit must be 1..100")
@@ -79,6 +79,8 @@ class HybridKnowledgeClient:
             or timeout_seconds <= 0
         ):
             raise ValueError("timeout_seconds must be finite and positive")
+        validate_weight(rerank_weight)
+        self.rerank_weight: float = rerank_weight
         self.dense: DenseRetriever = (
             _JoinedKnowledgeClient(dense.store, dense.embeddings, dense.tracer)
             if isinstance(dense, KnowledgeClient)
@@ -93,7 +95,9 @@ class HybridKnowledgeClient:
         self.rank_constant: int = rank_constant
         self.timeout_seconds: float = timeout_seconds
 
-    async def search(self, collection_id: str, query: str, limit: int = 5) -> HybridSearchResult:
+    async def search(
+        self, collection_id: str, query: str, limit: int = DEFAULT_LIMIT
+    ) -> HybridSearchResult:
         call_id = new_id("hybrid")
         await self.tracer.emit(
             "hybrid.request",
@@ -105,6 +109,8 @@ class HybridKnowledgeClient:
                 "rerank_limit": self.rerank_limit,
                 "rank_constant": self.rank_constant,
                 "timeout_seconds": self.timeout_seconds,
+                "final_ranking": "normalized_score_blend",
+                "rerank_weight": self.rerank_weight,
             },
             call_id,
         )
@@ -225,40 +231,4 @@ class HybridKnowledgeClient:
 
     async def _rerank(self, query: str, candidates: list[RankedCandidate]) -> list[HybridHit]:
         ranks = await self.reranker.rank(query, [row.passage for row in candidates])
-        return self._rank(candidates, ranks)
-
-    @staticmethod
-    def _rank(candidates: list[RankedCandidate], ranks: list[RerankHit]) -> list[HybridHit]:
-        if len(ranks) != len(candidates):
-            raise ValueError("Rerank response must score every candidate exactly once")
-        seen: set[int] = set()
-        hits: list[HybridHit] = []
-        for rank in ranks:
-            index = rank.candidate_index
-            if type(index) is not int or not 0 <= index < len(candidates) or index in seen:
-                raise ValueError("Rerank candidate index is invalid or duplicated")
-            if isinstance(rank.score, bool) or not math.isfinite(rank.score):
-                raise ValueError("Rerank scores must be finite numbers")
-            seen.add(index)
-            row = candidates[index]
-            hits.append(
-                HybridHit(
-                    row.passage,
-                    HybridRanking(
-                        row.dense_score,
-                        row.dense_rank,
-                        row.bm25_score,
-                        row.bm25_rank,
-                        row.rrf_score,
-                        rank.score,
-                    ),
-                )
-            )
-        return sorted(
-            hits,
-            key=lambda h: (
-                -h.ranking.rerank_score,
-                h.passage.source.doc_id,
-                h.passage.source.chunk_no,
-            ),
-        )
+        return rank_candidates(candidates, ranks, rerank_weight=self.rerank_weight)

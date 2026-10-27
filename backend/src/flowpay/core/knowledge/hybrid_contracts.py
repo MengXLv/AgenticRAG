@@ -50,6 +50,9 @@ class HybridRanking:
     bm25_rank: int | None
     rrf_score: float
     rerank_score: float
+    rrf_rank: int | None = None
+    rerank_rank: int | None = None
+    final_score: float | None = None
 
 
 @dataclass(frozen=True)

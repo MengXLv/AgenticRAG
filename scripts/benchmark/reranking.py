@@ -51,7 +51,12 @@ def _ndcg(
 
 
 def metrics(case: EvaluationCase, ids: list[str]) -> JsonObject:
-    k = 5
+    return metrics_at_k(case, ids, 5)
+
+
+def metrics_at_k(case: EvaluationCase, ids: list[str], k: int) -> JsonObject:
+    if type(k) is not int or not 1 <= k <= 10:
+        raise ValueError("Metric cutoff must be 1..10")
     top = ids[:k]
     selected = set(top)
     covered = sum(
@@ -69,21 +74,21 @@ def metrics(case: EvaluationCase, ids: list[str]) -> JsonObject:
             ids, case.grades, sorted(case.grades.values(), reverse=True), k
         )
     return {
-        "designated_group_coverage5": covered / len(case.evidence_groups)
+        f"designated_group_coverage{k}": covered / len(case.evidence_groups)
         if case.evidence_groups
         else None,
-        "all_designated_groups5": covered == len(case.evidence_groups)
+        f"all_designated_groups{k}": covered == len(case.evidence_groups)
         if case.evidence_groups
         else None,
-        "designated_positive_recall5": len(positives & selected) / len(positives)
+        f"designated_positive_recall{k}": len(positives & selected) / len(positives)
         if positives
         else None,
-        "known_positive_mrr5": next(
+        f"known_positive_mrr{k}": next(
             (1 / (i + 1) for i, pid in enumerate(top) if pid in positives), 0.0
         ),
-        "unjudged_top5_count": sum(pid not in case.grades for pid in top),
-        "judged_pool_ndcg5": conditional_ndcg,
-        "ndcg5": formal_ndcg,
+        f"unjudged_top{k}_count": sum(pid not in case.grades for pid in top),
+        f"judged_pool_ndcg{k}": conditional_ndcg,
+        f"ndcg{k}": formal_ndcg,
     }
 
 

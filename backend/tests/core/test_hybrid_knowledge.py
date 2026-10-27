@@ -74,6 +74,7 @@ def make_client(
         retrieval_input,
         rerank_limit=rerank_limit,
         timeout_seconds=timeout_seconds,
+        rerank_weight=1.0,
     ), store
 
 
@@ -129,6 +130,29 @@ async def test_empty_candidates_skip_reranker(tmp_path: Path) -> None:
     client, _ = make_client(tmp_path, Dense([]), Lexical([]), rerank)
     assert (await client.search("ready", "query")).hits == []
     assert not rerank.calls
+
+
+async def test_default_client_blends_scores_and_keeps_requested_limit(tmp_path: Path) -> None:
+    source = [passage(name, name) for name in "ABC"]
+    store = EventStore(tmp_path / "default.sqlite")
+    client = HybridKnowledgeClient(
+        Dense(source),
+        Lexical([]),
+        Rerank([RerankHit(0, 0), RerankHit(1, 1), RerankHit(2, 0.9)]),
+        Tracer(store, "s", "r"),
+        retrieval_input,
+    )
+    result = await client.search("ready", "query", limit=2)
+    assert [h.passage.source.doc_id for h in result.hits] == ["B", "C"]
+    assert store.read("s")[0]["payload"]["rerank_weight"] == 0.75
+    assert result.hits[0].ranking.final_score is not None
+
+
+async def test_new_pipeline_default_is_six_but_explicit_five_is_respected(tmp_path: Path) -> None:
+    source = [passage(str(i), str(i)) for i in range(8)]
+    client, _ = make_client(tmp_path, Dense(source), Lexical([]), Rerank())
+    assert len((await client.search("ready", "query")).hits) == 6
+    assert len((await client.search("ready", "query", limit=5)).hits) == 5
 
 
 async def test_tied_rerank_scores_use_stable_document_order(tmp_path: Path) -> None:
