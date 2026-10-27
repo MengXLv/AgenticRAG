@@ -28,7 +28,7 @@ document_id_hint = "文档编号本身，例如 KB-TS-012。从片段编号 doc:
 
 read_document_description = "按文档编号整篇读回它的全部片段，按顺序排列。已经知道某份文档相关、但检索只给出零散片段时使用。"
 
-hybrid_search_documents_description = "结合语义与关键词检索文档，经 RRF 筛选候选后按 Cross-Encoder 分数排序，返回原文片段和引用 ID。适合错误码、字段名、版本号或需要同时匹配多项条件的问题。默认返回 6 条；分数仅用于本次结果排序，不是答案置信度。"
+hybrid_search_documents_description = "结合语义与关键词检索文档，经 RRF 筛选候选后按 Cross-Encoder 分数排序，返回原文片段和引用 ID。适合错误码、字段名、版本号或需要同时匹配多项条件的问题。默认返回 7 条；分数仅用于本次结果排序，不是答案置信度。"
 
 sql_filter_required = "除账户与环境外至少再给一个条件：{filters}。"
 

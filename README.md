@@ -85,12 +85,13 @@ dimensions / request_options），对不上直接报错，不会让检索悄悄�
 默认 Docker 镜像未安装 reranking extra，也未分配 GPU，需准备对应运行环境后再启用。
 
 新工具执行语义/BM25 各 Top-50 → RRF Top-30 → 预训练 Cross-Encoder 按分数排序 → Top-K，
-默认返回 6 条，允许显式指定 1–10 条。模型与索引在启动时准备并跨轮复用；
+默认返回 7 条，允许显式指定 1–10 条。模型与索引在启动时准备并跨轮复用；
 缺少权重、依赖、设备或集合时启动失败，聊天请求不下载模型、不现场训练。
 删除配置项及环境覆盖后重启即可关闭。
 
 当前最终排序仅使用 Cross-Encoder 分数，RRF 仅筛选候选；
-[切换验证与同预算对照](docs/superpowers/plans/2026-10-27-cross-encoder-final-order-verification.md)。
+[排序切换验证](docs/superpowers/plans/2026-10-27-cross-encoder-final-order-verification.md)与
+[默认 Top-7 的效果及上下文增量](docs/superpowers/plans/2026-10-27-top-seven-verification.md)。
 
 验证范围及运行证据见 [工具接入验收记录](docs/superpowers/plans/2026-10-27-tool-injection-verification.md)。
 

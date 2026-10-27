@@ -40,6 +40,7 @@ class RetrievalCase:
     # 只接收预热后真实执行的耗时；重复执行不增加质量评测样本数。
     warm_timings_ms: dict[Strategy, list[float]] = field(default_factory=dict)
     measured_rerank_weight: float | None = None
+    measured_limit: int | None = None
 
 
 def attribute_groups(
@@ -81,7 +82,9 @@ def _interval(families: dict[str, list[float]], samples: int) -> list[float] | N
     ]
 
 
-def _timings(cases: list[RetrievalCase], rerank_weight: float) -> JsonObject | None:
+def _timings(
+    cases: list[RetrievalCase], rerank_weight: float, limit: int
+) -> JsonObject | None:
     if not any(case.warm_timings_ms for case in cases):
         return None
     counts: set[int] = set()
@@ -94,9 +97,10 @@ def _timings(cases: list[RetrievalCase], rerank_weight: float) -> JsonObject | N
         if (
             case.measured_rerank_weight is None
             or case.measured_rerank_weight != rerank_weight
+            or case.measured_limit != limit
         ):
             raise ValueError(
-                "Warm timing policy must match the evaluated rerank weight"
+                "Warm timing policy must match the evaluated rerank weight and limit"
             )
         for values in case.warm_timings_ms.values():
             if len(values) < 3 or any(
@@ -165,7 +169,7 @@ def analyze(
         > 1
     ):
         raise ValueError("Comparison requires the same collection")
-    timings = _timings(cases, rerank_weight)
+    timings = _timings(cases, rerank_weight, limit)
     rows: list[JsonObject] = []
     losses: Counter[LossStage] = Counter()
     metrics_by_strategy: dict[Strategy, list[JsonObject]] = {

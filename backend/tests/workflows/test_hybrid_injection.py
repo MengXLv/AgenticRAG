@@ -42,7 +42,7 @@ class Hybrid:
     def __init__(self) -> None:
         self.queries: list[tuple[str, str, int]] = []
 
-    async def search(self, collection_id: str, query: str, limit: int = 6) -> HybridSearchResult:
+    async def search(self, collection_id: str, query: str, limit: int = 7) -> HybridSearchResult:
         self.queries.append((collection_id, query, limit))
         return HybridSearchResult(
             [HybridHit(hit(), HybridRanking(0.8, 1, 3.0, 1, 0.03, -7.0, 1, 1, 0.95))]
@@ -127,7 +127,7 @@ async def test_registration_evidence_budget_and_checkpoint(tmp_path: Path, stage
         await manager.tasks[sid]
         view = await manager.get_session(sid)
         assert view["status"] == "completed"
-        assert hybrid.queries == [("fixture", "HTTP 410", 6)]
+        assert hybrid.queries == [("fixture", "HTTP 410", 7)]
         assert old.queries == [(retrieval_input("HTTP 410"), 10)]
         assert view["state"]["tool_calls"] == 2
         assert len(require_list(view["state"]["evidence"])) == 1
@@ -165,7 +165,7 @@ async def test_registration_evidence_budget_and_checkpoint(tmp_path: Path, stage
             model.responses = [completion(calls=[call("next", "HTTP 410")]), grounded()]
             await manager.submit_message(sid, "second", "再查一次同一个条件")
             await manager.tasks[sid]
-            assert hybrid.queries == [("fixture", "HTTP 410", 6)]
+            assert hybrid.queries == [("fixture", "HTTP 410", 7)]
             assert (await manager.get_session(sid))["state"]["tool_calls"] == 0
         else:
             model.responses = [grounded()]

@@ -150,10 +150,13 @@ async def test_default_client_uses_cross_encoder_scores_and_keeps_requested_limi
     assert result.hits[0].ranking.final_score == result.hits[0].ranking.rerank_score
 
 
-async def test_new_pipeline_default_is_six_but_explicit_five_is_respected(tmp_path: Path) -> None:
+async def test_new_pipeline_default_is_seven_but_explicit_limits_are_respected(
+    tmp_path: Path,
+) -> None:
     source = [passage(str(i), str(i)) for i in range(8)]
     client, _ = make_client(tmp_path, Dense(source), Lexical([]), Rerank())
-    assert len((await client.search("ready", "query")).hits) == 6
+    assert len((await client.search("ready", "query")).hits) == 7
+    assert len((await client.search("ready", "query", limit=6)).hits) == 6
     assert len((await client.search("ready", "query", limit=5)).hits) == 5
 
 

@@ -21,7 +21,7 @@ from .test_reranking import FakeBackend, settings
 
 async def test_projection_keeps_ranking_separate_from_similarity() -> None:
     async def handle(arguments: HybridDocumentSearchArguments) -> HybridDocumentSearchResult:
-        assert arguments.limit == 6
+        assert arguments.limit == 7
         return HybridDocumentSearchResult(
             arguments.query,
             [HybridHit(passage("A", "text"), HybridRanking(0.8, 1, 2.0, 1, 0.03, -4.0, 1, 1, 0.9))],

@@ -40,6 +40,21 @@ def test_comparison_uses_same_budget_and_keeps_unknown_labels_unknown() -> None:
     assert report["question_count"] == 1 and report["scenario_family_count"] == 1
 
 
+def test_default_cutoff_is_seven_and_explicit_six_keeps_same_prefix() -> None:
+    case = sample()
+    seven = analyze([case], rerank_limit=10, bootstrap_samples=100)
+    six = analyze([case], rerank_limit=10, limit=6, bootstrap_samples=100)
+    assert require_object(seven["policy"])["k"] == 7
+    for name in ("dense", "bm25", "rrf", "hybrid"):
+        seven_ids = require_list(
+            require_object(require_object(require_list(seven["rows"])[0])[name])["ids"]
+        )
+        six_ids = require_list(
+            require_object(require_object(require_list(six["rows"])[0])[name])["ids"]
+        )
+        assert len(seven_ids) == 7 and seven_ids[:6] == six_ids
+
+
 def test_evidence_groups_distinguish_recall_cutoff_and_selection_losses() -> None:
     groups = [[["absent"]], [["late"]], [["candidate"]], [["selected"]], [["absent"], ["selected"]]]
     assert attribute_groups(
@@ -98,7 +113,7 @@ def test_zero_recall_stays_in_denominator_instead_of_being_dropped() -> None:
     assert report["question_count"] == 1
     assert report["hybrid_group_loss_stages"] == {"recall_miss": 2}
     hybrid = require_object(require_object(report["summary"])["hybrid"])
-    assert hybrid["designated_group_coverage6"] == 0.0
+    assert hybrid["designated_group_coverage7"] == 0.0
 
 
 def test_measured_rounds_are_separate_from_quality_sample_size() -> None:
@@ -106,12 +121,15 @@ def test_measured_rounds_are_separate_from_quality_sample_size() -> None:
         sample(),
         warm_timings_ms={name: [1.0, 2.0, 3.0] for name in ("dense", "bm25", "rrf", "hybrid")},
         measured_rerank_weight=1.0,
+        measured_limit=7,
     )
     report = analyze([case], rerank_limit=10)
     assert report["question_count"] == 1
     performance = require_object(report["performance"])
     assert require_object(performance["hybrid"])["measurement_count"] == 3
     assert require_object(performance["hybrid"])["warm_p95_ms"] == 3.0
+    with pytest.raises(ValueError, match="policy"):
+        analyze([replace(case, measured_limit=6)], rerank_limit=10)
     with pytest.raises(ValueError, match="policy"):
         analyze([replace(case, measured_rerank_weight=0.75)], rerank_limit=10)
     with pytest.raises(ValueError, match="policy"):

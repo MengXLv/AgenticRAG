@@ -5,7 +5,7 @@ import math
 from .hybrid_contracts import HybridHit, HybridRanking, RankedCandidate, RerankHit
 
 DEFAULT_RERANK_WEIGHT = 1.0
-DEFAULT_LIMIT = 6
+DEFAULT_LIMIT = 7
 
 
 def validate_weight(weight: float) -> None:

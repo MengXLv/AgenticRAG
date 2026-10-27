@@ -14,6 +14,8 @@
 
 ## Global Constraints
 
+最终返回预算调整：用户随后要求将默认 Top-6 改为 Top-7；显式 limit 保持 1–10，召回、RRF 候选数量与纯 Cross-Encoder 排序不变。验证见 `2026-10-27-top-seven-verification.md`。
+
 执行调整（2026-10-27）：用户明确选择恢复“RRF 筛选候选后仅由 Cross-Encoder 排序”。线上不再混合 RRF 位次先验；历史 0.75 融合报告保留为对照。默认 K 仍为 6，其他预算与工具契约不变。当前验证见 `2026-10-27-cross-encoder-final-order-verification.md`。
 
 执行调整（2026-10-26）：用户要求跳过步骤 1，直接开始步骤 2。本轮仅实施 BM25；质量对照、冻结预算不作为本轮前置条件。步骤 2 的性能数值作为测量报告，不宣称通过尚未定义的 SLA。详见 `2026-10-26-bm25-verification.md`。
@@ -22,7 +24,7 @@
 - 不改变文档切割策略，不重新生成已有文档向量。允许读取现有片段建立词法索引。
 - s1 保留现有纯向量基线；新工具仅在显式启用时加入 s2/s3/s4。
 - workflows 只处理编排、提示词、预算和业务决策；SDK、SQL、索引、模型推理与追踪实现在 core。
-- 新工具只接受 query 和 limit；修复后的新混合链路 limit 默认 6，严格整数 1..10；query 非空且最多 1000 字符。原工具默认值不变。
+- 新工具只接受 query 和 limit；当前新混合链路 limit 默认 7，严格整数 1..10；query 非空且最多 1000 字符。原工具默认值不变。
 - 初始实验参数：每路最多 50 条，RRF 常数 60，融合后最多 30 条，最终最多 limit 条；参数必须满足 rerank_limit >= 最大允许的 limit。
 - 新工具收到原始查询。仅向量分支应用现有 Qwen 查询指令，BM25 和重排不使用该指令前缀。
 - 两路必须使用同一 ready collection；内部身份键为 (collection_id, doc_id, chunk_no)。不跨集合混合。
@@ -146,7 +148,7 @@
 
 **Files:** 新增 `hybrid_tools.py`；修改 `execution/runtime.py`、`execution/resources.py`、`agent/turn.py`、配置 settings/loader、s2/s3/s4 和启动校验；新增 `backend/tests/core/test_hybrid_tools.py` 并扩展对应 workflow/config 测试。
 
-**Interfaces:** `HybridDocumentSearchArguments(query: str, limit: int = 6)`；Runtime 新增独立 `search_hybrid_knowledge(query: str, *, limit: int = 6) -> HybridSearchResult`；AgentTurn 新入口登记 hit.passage 并保留原始 ranking。旧入口签名不变。
+**Interfaces:** `HybridDocumentSearchArguments(query: str, limit: int = 7)`；Runtime 新增独立 `search_hybrid_knowledge(query: str, *, limit: int = 7) -> HybridSearchResult`；AgentTurn 新入口登记 hit.passage 并保留原始 ranking。旧入口签名不变。
 
 - [x] 新工具结果仅暴露 query、passages（空结果或限制可附 notice）；每条片段给出 id/title/text/rerank_score/final_score，来源留在证据与日志，其他阶段分数留在追踪。final_score 对应排名修复后的融合排序，rerank_score 保留原始模型分数。工具说明明确混合召回并重排。
 - [x] 参数验证：空白 query、超长 query、额外字段、bool/小数 limit、超出 1..10 均拒绝。

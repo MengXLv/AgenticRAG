@@ -20,7 +20,6 @@ from flowpay.core.json import (
 )
 from flowpay.core.knowledge.hybrid_contracts import RankedCandidate, RerankHit
 from flowpay.core.knowledge.ranking import (
-    DEFAULT_LIMIT,
     rank_candidates,
 )
 from pydantic import TypeAdapter
@@ -65,7 +64,7 @@ def analyze(
     scored_rows: list[JsonObject],
     *,
     rerank_weight: float = 0.75,
-    limit: int = DEFAULT_LIMIT,
+    limit: int = 6,
     lengths_by_query: dict[str, list[int]] | None = None,
 ) -> JsonObject:
     validate_cases(cases)

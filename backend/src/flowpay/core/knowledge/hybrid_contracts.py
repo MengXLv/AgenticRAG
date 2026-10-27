@@ -68,7 +68,7 @@ class HybridSearchResult:
 
 class HybridRetriever(Protocol):
     async def search(
-        self, collection_id: str, query: str, limit: int = 6
+        self, collection_id: str, query: str, limit: int = 7
     ) -> HybridSearchResult: ...
 
 

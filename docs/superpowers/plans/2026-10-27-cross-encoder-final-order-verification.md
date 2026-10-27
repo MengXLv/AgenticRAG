@@ -1,5 +1,7 @@
 # 最终排序切换为纯 Cross-Encoder
 
+本记录保留切换时 Top-6 的验证结果。随后默认返回量已按用户要求改为 Top-7，见 [Top-7 验证记录](2026-10-27-top-seven-verification.md)；纯模型排序策略不变。
+
 按用户明确选择，当前链路为：语义/BM25 各 Top-50 → RRF Top-30 → Cross-Encoder 按原始分数降序 → Top-K。默认 K=6，显式 1–10 保持原样。
 
 ## 实现与协议
