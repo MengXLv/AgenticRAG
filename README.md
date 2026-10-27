@@ -59,6 +59,13 @@ dimensions / request_options），对不上直接报错，不会让检索悄悄�
 端口参与向量空间身份比较（主机名不参与，`127.0.0.1`、`host.docker.internal`、
 `ollama` 会被归一成同一个部署）。
 
+## 检索对照评测
+
+`scripts/benchmark/retrieval.py` 可在同一 K 下重放 Dense、BM25、RRF 与 Hybrid，
+区分召回缺失、RRF 截断和最终选择造成的证据缺口，并按场景族估计配对差异区间。
+运行方式、真实测量范围和当前瓶颈见
+[四策略检索对照记录](docs/superpowers/plans/2026-10-27-retrieval-comparison-verification.md)。
+
 ## 提示词维护
 
 各阶段系统提示词、动态上下文、工具说明与公共纠错指令已独立到

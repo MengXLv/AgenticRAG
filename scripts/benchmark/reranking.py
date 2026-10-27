@@ -92,7 +92,7 @@ def metrics_at_k(case: EvaluationCase, ids: list[str], k: int) -> JsonObject:
     }
 
 
-def validate_cases(cases: list[EvaluationCase]) -> None:
+def validate_cases(cases: list[EvaluationCase], *, allow_empty: bool = False) -> None:
     families: dict[str, str] = {}
     identifiers: set[str] = set()
     if not cases:
@@ -103,13 +103,13 @@ def validate_cases(cases: list[EvaluationCase]) -> None:
         identifiers.add(case.question_id)
         if families.setdefault(case.scenario_family_id, case.split) != case.split:
             raise ValueError("Scenario family crosses development/holdout splits")
-        if not case.candidates or len(case.candidates) > 30:
+        if (not case.candidates and not allow_empty) or len(case.candidates) > 30:
             raise ValueError("Each case needs 1..30 frozen RRF candidates")
         keys = [
             (p.source.collection_id, p.source.doc_id, p.source.chunk_no)
             for p in case.candidates
         ]
-        if len(set(keys)) != len(keys) or len({key[0] for key in keys}) != 1:
+        if len(set(keys)) != len(keys) or len({key[0] for key in keys}) > 1:
             raise ValueError("Candidates must be unique and from one collection")
         if len({p.id for p in case.candidates}) != len(case.candidates):
             raise ValueError("Candidate ids must be unique")
