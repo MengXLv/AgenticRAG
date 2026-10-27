@@ -129,10 +129,12 @@
 
 **Interfaces:** 实现步骤 4 的 Reranker。适配器返回输入候选的索引和分数，模型只加载一次或复用服务连接；同步推理不得阻塞事件循环。
 
-- [ ] 在开发集实测中文多语言 Cross-Encoder，记录精确模型 ID/revision、库版本、设备、max_length、batch_size、截断和超时设置，选定配置后冻结再跑验收集。
-- [ ] 用假适配响应验证顺序映射、批处理、超时、取消与错误传播；真实集验证 FP-4021/相近错误码、否定与条件规则，人工复核高分误排。
-- [ ] 执行 `<PY> -m pytest backend/tests/core/test_reranking.py -q`；运行固定验收集的 hybrid 策略，比较同一 RRF 候选池重排前后 nDCG@5、Recall@5、证据全覆盖率。
-- [ ] 分开报告模型加载、首次推理、热态 p50/p95，确认模型重复查询不重新加载，输入预算和截断日志可追查。
+- [x] 固定模型 ID/revision、库版本、设备、max_length、batch_size、截断和超时，再运行按场景族隔离的开发诊断与留出诊断。
+- [x] 用假适配响应验证顺序映射、批处理、超时、取消与错误传播；真实查询验证错误码和条件规则，人工复核覆盖退化样例。
+- [x] 执行 `<PY> -m pytest backend/tests/core/test_reranking.py -q`；对固定真实 RRF 候选比较已标注正例召回和证据组覆盖。因现有标注不完整，不生成正式 nDCG。
+- [x] 分开报告模型加载、首次推理、热态 p50/p95，确认模型重复查询不重新加载，输入预算和截断日志可追查。
+
+2026-10-27 状态：模型适配及真实实测完成，**严格质量验收未通过，不默认启用**。指定证据组覆盖上升，但留出诊断中指定正例 Recall@5 下降，且无完整正式 nDCG 标注。详见 `2026-10-27-cross-encoder-verification.md`；不得将条件性 judged-pool nDCG 当正式 nDCG。
 
 **通过标准：** 协议测试全过；目标机达到冻结资源/延迟预算；真实 hybrid 在验收集相对 rrf 的 nDCG@5 提升且 Recall@5 不下降。未满足时不进入默认启用，保留失败样本和参数结果。**提交：** `feat: add verified cross-encoder reranking`。
 

@@ -1,0 +1,12 @@
+# 仅供重排验证/显式装配使用；不会自动启用聊天工具。
+[reranking]
+model_id = "BAAI/bge-reranker-v2-m3"
+revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+device = "cuda"
+dtype = "float16"
+batch_size = 4
+max_length = 512
+max_query_tokens = 128
+timeout_seconds = 30
+cache_dir = "../../var/models/huggingface"
+local_files_only = true
