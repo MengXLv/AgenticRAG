@@ -9,6 +9,8 @@ from flowpay.core.data_sources import SourceClient
 from flowpay.core.data_sources.reader import SourceResult
 from flowpay.core.json import JsonObject
 from flowpay.core.knowledge.contracts import DocumentRetriever, Passage
+from flowpay.core.knowledge.hybrid_contracts import HybridRetriever, HybridSearchResult
+from flowpay.core.knowledge.ranking import DEFAULT_LIMIT
 from flowpay.core.llm.chat import ChatModel
 from flowpay.core.llm.chat.client import ChatClient
 from flowpay.core.tools import Tool, Toolbox
@@ -27,12 +29,22 @@ class AgentRuntime:
         sources: SourceClient | None = None,
         knowledge: DocumentRetriever | None = None,
         collection_id: str | None = None,
+        hybrid: HybridRetriever | None = None,
     ):
         """绑定本轮追踪与已装配的只读能力。"""
         self.tracer: Tracer = tracer
         self.sources: SourceClient | None = sources
         self.knowledge: DocumentRetriever | None = knowledge
         self.collection_id: str | None = collection_id
+        self.hybrid: HybridRetriever | None = hybrid
+
+    async def search_hybrid_knowledge(
+        self, query: str, *, limit: int = DEFAULT_LIMIT
+    ) -> HybridSearchResult:
+        """原始查询交给协调器，仅其中的向量分支添加检索指令。"""
+        if self.hybrid is None or self.collection_id is None:
+            raise RuntimeError("Hybrid search requires an enabled hybrid retriever")
+        return await self.hybrid.search(self.collection_id, query, limit)
 
     def chat(self, model: ChatModel) -> ChatClient:
         """把一个模型包成带记录的调用入口；阶段可以为不同用途选择不同模型。"""

@@ -10,11 +10,17 @@ from typing import Protocol
 from flowpay.core.agent.trace import Tracer
 from flowpay.core.config import Settings
 from flowpay.core.data_sources import DataSources, SourceClient
-from flowpay.core.json import JsonObject
+from flowpay.core.json import JsonObject, to_json_object
 from flowpay.core.knowledge.client import KnowledgeClient
 from flowpay.core.knowledge.contracts import Collection, DocumentRetriever, VectorStore
+from flowpay.core.knowledge.hybrid import HybridKnowledgeClient
+from flowpay.core.knowledge.hybrid_contracts import HybridRetriever
+from flowpay.core.knowledge.lexical import BM25Retriever
 from flowpay.core.llm.embedding import EmbeddingClient
+from flowpay.core.llm.embedding.ollama import retrieval_input
 from flowpay.core.llm.embedding.openai_embedding import OpenAiEmbeddingModel
+from flowpay.core.llm.reranking.client import CrossEncoderReranker, RerankingModel
+from flowpay.core.llm.reranking.settings import RerankingSettings
 
 from .errors import Conflict
 
@@ -45,6 +51,7 @@ class RuntimeResources:
         knowledge: KnowledgeReader | None = None,
         vectors: VectorStore | None = None,
         retriever: Callable[[Tracer], DocumentRetriever] | None = None,
+        hybrid_retriever: Callable[[Tracer], HybridRetriever] | None = None,
     ):
         """保存配置、只读数据源和知识连接。
 
@@ -57,6 +64,12 @@ class RuntimeResources:
         self.vectors: VectorStore | None = vectors
         self.retriever: Callable[[Tracer], DocumentRetriever] | None = retriever
         self.source_client: SourceClient | None = SourceClient(sources) if sources else None
+        self._hybrid_retriever: Callable[[Tracer], HybridRetriever] | None = hybrid_retriever
+        self._reranking_model: RerankingModel | None = None
+
+    def hybrid_document_retriever(self, tracer: Tracer) -> HybridRetriever | None:
+        """客户端按轮绑定追踪；工厂闭包内的索引和模型跨轮复用。"""
+        return self._hybrid_retriever(tracer) if self._hybrid_retriever else None
 
     def document_retriever(self, tracer: Tracer) -> DocumentRetriever | None:
         """为一轮运行装配带追踪的检索客户端；连接池仍由本对象持有并复用。"""
@@ -83,7 +96,38 @@ class RuntimeResources:
             else None
         )
         # 检索与版本核对共用同一个连接池；管理器结束全部任务后再统一关闭。
-        return cls(settings, sources, knowledge, knowledge)
+        resources = cls(settings, sources, knowledge, knowledge)
+        try:
+            if settings.hybrid_reranking_config is not None:
+                if knowledge is None or settings.embedding is None:
+                    raise ValueError("Hybrid search requires a knowledge collection and embedding")
+                reranking = RerankingSettings.load(settings.hybrid_reranking_config)
+                if not reranking.local_files_only:
+                    raise ValueError("Online hybrid search requires local_files_only=true")
+                model = RerankingModel(reranking)
+                lexical = BM25Retriever(knowledge)
+                # 启动时验证权重、设备与集合；普通聊天请求不触发下载或重建索引。
+                model.prepare()
+                assert settings.knowledge_collection_id is not None
+                lexical.prepare(settings.knowledge_collection_id)
+
+                def hybrid(tracer: Tracer) -> HybridKnowledgeClient:
+                    dense = resources.document_retriever(tracer)
+                    assert dense is not None
+                    return HybridKnowledgeClient(
+                        dense,
+                        lexical,
+                        CrossEncoderReranker(reranking, tracer, model=model),
+                        tracer,
+                        retrieval_input,
+                    )
+
+                resources._hybrid_retriever = hybrid
+                resources._reranking_model = model
+            return resources
+        except BaseException:
+            resources.close()
+            raise
 
     def close(self) -> None:
         """关闭本对象持有的知识读取器；调用前应结束所有使用它的 Run。"""
@@ -93,6 +137,8 @@ class RuntimeResources:
     def _snapshot(self) -> JsonObject:
         """同步校验来源与知识版本并形成配置快照；集合未就绪或版本冲突时拒绝运行。"""
         snapshot = self.settings.snapshot()
+        if self._reranking_model is not None:
+            snapshot["hybrid_reranking"] = to_json_object(self._reranking_model.settings)
         if self.sources:
             snapshot["data_sources"] = self.sources.verify()
         if self.knowledge and self.settings.knowledge_collection_id:

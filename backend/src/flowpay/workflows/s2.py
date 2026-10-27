@@ -7,6 +7,11 @@ from flowpay.core.agent import AgentTurn, Budget
 from flowpay.core.execution.contracts import TurnInput, TurnResult
 from flowpay.core.execution.runtime import AgentRuntime
 from flowpay.core.execution.stage import StageCard
+from flowpay.core.knowledge.hybrid_tools import (
+    HybridDocumentSearchArguments,
+    HybridDocumentSearchResult,
+    hybrid_document_search_tool,
+)
 from flowpay.core.knowledge.tools import (
     DocumentReadArguments,
     DocumentReadResult,
@@ -80,6 +85,19 @@ class S2Workflow:
             actions.append(ToolAction("search_documents", query, len(hits)))
             return DocumentSearchResult(query, hits, "未检索到片段。" if not hits else None)
 
+        async def hybrid_search_documents(
+            arguments: HybridDocumentSearchArguments,
+        ) -> HybridDocumentSearchResult:
+            """原始查询进入双路召回；与所有工具共用预算，单独记录查询去重键。"""
+            query = " ".join(arguments.query.split())
+            if refused := self.claim(agent, done, "hybrid", query):
+                return HybridDocumentSearchResult(query, [], refused)
+            result = await agent.search_hybrid(query, limit=arguments.limit)
+            actions.append(ToolAction("hybrid_search_documents", query, len(result.hits)))
+            return HybridDocumentSearchResult(
+                query, result.hits, "未检索到片段。" if not result.hits else None
+            )
+
         async def read_document(arguments: DocumentReadArguments) -> DocumentReadResult:
             """整篇读回；与检索共用同一份工具预算和去重记录。"""
             doc_id = arguments.doc_id
@@ -91,7 +109,11 @@ class S2Workflow:
                 doc_id, passages, "集合中没有这个文档编号。" if not passages else None
             )
 
-        agent.offer(document_search_tool(search_documents), document_read_tool(read_document))
+        agent.offer(
+            document_search_tool(search_documents),
+            document_read_tool(read_document),
+            *([hybrid_document_search_tool(hybrid_search_documents)] if runtime.hybrid else []),
+        )
         while agent.may_think():
             reply = await agent.think()
             if reply.is_answer:
@@ -106,7 +128,7 @@ class S2Workflow:
     def claim(agent: AgentTurn, done: set[str], tool: str, target: str) -> str | None:
         """申领一次工具调用：获准则记账并返回 None，否则返回交回模型的说明。
 
-        两个工具共用一份预算和一份去重记录，因此"换个工具再问同一件事"也拦得住。
+        全部工具共享预算；语义检索与混合检索使用独立键，允许比较同一查询。
         """
         key = f"{tool}:{target.casefold()}"
         if key in done:

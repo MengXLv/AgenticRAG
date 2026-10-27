@@ -249,6 +249,7 @@ class SessionManager:
             self.resources.source_client,
             self.resources.document_retriever(tracer),
             self.settings.knowledge_collection_id,
+            self.resources.hybrid_document_retriever(tracer),
         )
         try:
             outcome = await self.workflow.run(value, runtime)

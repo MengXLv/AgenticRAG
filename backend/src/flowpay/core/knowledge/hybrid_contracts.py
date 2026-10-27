@@ -66,6 +66,12 @@ class HybridSearchResult:
     hits: list[HybridHit]
 
 
+class HybridRetriever(Protocol):
+    async def search(
+        self, collection_id: str, query: str, limit: int = 6
+    ) -> HybridSearchResult: ...
+
+
 class PassageSourceReader(Protocol):
     """仅从已就绪的不可变集合读取索引素材。"""
 

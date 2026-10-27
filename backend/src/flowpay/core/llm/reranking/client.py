@@ -43,6 +43,27 @@ class _Prediction:
     inference_ms: float
 
 
+class RerankingModel:
+    """资源所有者持有的模型与互斥锁；不持有任何一轮的追踪。"""
+
+    def __init__(
+        self,
+        settings: RerankingSettings,
+        *,
+        factory: Callable[[RerankingSettings], PairScorer] = _default_factory,
+    ) -> None:
+        self.settings: RerankingSettings = settings
+        self.factory: Callable[[RerankingSettings], PairScorer] = factory
+        self.backend: PairScorer | None = None
+        self.lock: threading.Lock = threading.Lock()
+
+    def prepare(self) -> None:
+        """启动阶段同步预加载，缺少依赖、权重或设备时直接拒绝启动。"""
+        with self.lock:
+            if self.backend is None:
+                self.backend = self.factory(self.settings)
+
+
 class CrossEncoderReranker:
     def __init__(
         self,
@@ -50,12 +71,13 @@ class CrossEncoderReranker:
         tracer: EventSink,
         *,
         factory: Callable[[RerankingSettings], PairScorer] = _default_factory,
+        model: RerankingModel | None = None,
     ) -> None:
         self.settings: RerankingSettings = settings
         self.tracer: EventSink = tracer
-        self._factory: Callable[[RerankingSettings], PairScorer] = factory
-        self._backend: PairScorer | None = None
-        self._lock: threading.Lock = threading.Lock()
+        if model is not None and model.settings != settings:
+            raise ValueError("Shared reranking model settings differ")
+        self.model: RerankingModel = model or RerankingModel(settings, factory=factory)
 
     async def prepare(self) -> None:
         """显式预加载，不执行模型推理。"""
@@ -118,16 +140,16 @@ class CrossEncoderReranker:
 
     def _predict(self, query: str, texts: list[str], stop: threading.Event) -> _Prediction:
         # 可取消排队等待；同一实例串行使用模型，避免并发推理抢占显存。
-        while not self._lock.acquire(timeout=0.05):
+        while not self.model.lock.acquire(timeout=0.05):
             if stop.is_set():
                 raise RuntimeError("Rerank cancelled before inference")
         try:
             if stop.is_set():
                 raise RuntimeError("Rerank cancelled before inference")
-            loaded = self._backend is None
+            loaded = self.model.backend is None
             started = time.perf_counter()
-            if self._backend is None:
-                self._backend = self._factory(self.settings)
+            if self.model.backend is None:
+                self.model.backend = self.model.factory(self.settings)
             load_ms = (time.perf_counter() - started) * 1000 if loaded else 0.0
             scores: list[float] = []
             lengths: list[int] = []
@@ -138,7 +160,7 @@ class CrossEncoderReranker:
                 if stop.is_set():
                     raise RuntimeError("Rerank cancelled between batches")
                 batch = texts[offset : offset + self.settings.batch_size]
-                prediction = self._backend.predict(query, batch)
+                prediction = self.model.backend.predict(query, batch)
                 if (
                     len(prediction.scores) != len(batch)
                     or len(prediction.passage_tokens) != len(batch)
@@ -161,4 +183,4 @@ class CrossEncoderReranker:
                 (time.perf_counter() - started) * 1000,
             )
         finally:
-            self._lock.release()
+            self.model.lock.release()

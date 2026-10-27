@@ -4,6 +4,8 @@ data_dir = "../../var/live"
 dataset_path = "../../dataset/data"
 # s0 已发布的业务知识快照，s1 从这里开始检索。
 knowledge_collection_id = "flowpay_docs_v1_qwen3_06b"
+# 可选混合检索工具（需安装 reranking extra 并预先准备本地权重）：
+# hybrid_reranking_config = "reranking.toml"
 # s4 的业务工具按这份策略访问 dataset；只读、按操作名登记、表列白名单。
 sources_config = "../policies/sources.toml"
 host = "127.0.0.1"

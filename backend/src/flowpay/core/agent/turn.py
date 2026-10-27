@@ -13,7 +13,9 @@ from flowpay.core.chat.context import chat_messages
 from flowpay.core.execution.contracts import TurnInput, TurnResult
 from flowpay.core.json import JsonObject, to_json_object
 from flowpay.core.knowledge.contracts import Passage
+from flowpay.core.knowledge.hybrid_contracts import HybridSearchResult
 from flowpay.core.knowledge.passages import PassageSet
+from flowpay.core.knowledge.ranking import DEFAULT_LIMIT
 from flowpay.core.llm.chat import ChatModel
 from flowpay.core.llm.chat.client import ChatClient
 from flowpay.core.llm.chat.messages import MessageLog, ModelOutputError
@@ -189,6 +191,12 @@ class AgentTurn:
     async def read(self, doc_id: str) -> list[Passage]:
         """整篇读回一份文档并登记它的分块；返回空列表表示集合里没有这篇文档。"""
         return self.retrieved.add(await self.runtime.read_document(doc_id))
+
+    async def search_hybrid(self, query: str, limit: int = DEFAULT_LIMIT) -> HybridSearchResult:
+        """证据按原文 ID 去重；本次排名单独返回，避免被历史相似度覆盖。"""
+        result = await self.runtime.search_hybrid_knowledge(query, limit=limit)
+        self.retrieved.add([hit.passage for hit in result.hits])
+        return result
 
     def accept(self, reply: Reply, **state: object) -> TurnResult:
         """提交模型给出的回答。

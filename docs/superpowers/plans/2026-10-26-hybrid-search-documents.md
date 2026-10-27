@@ -144,14 +144,14 @@
 
 **Files:** 新增 `hybrid_tools.py`；修改 `execution/runtime.py`、`execution/resources.py`、`agent/turn.py`、配置 settings/loader、s2/s3/s4 和启动校验；新增 `backend/tests/core/test_hybrid_tools.py` 并扩展对应 workflow/config 测试。
 
-**Interfaces:** `HybridSearchArguments(query: str, limit: int = 5)`；Runtime 新增独立 `search_hybrid_knowledge(query: str, *, limit: int = 5) -> HybridSearchResult`；AgentTurn 新入口登记 hit.passage 并保留原始 ranking。旧入口签名不变。
+**Interfaces:** `HybridDocumentSearchArguments(query: str, limit: int = 6)`；Runtime 新增独立 `search_hybrid_knowledge(query: str, *, limit: int = 6) -> HybridSearchResult`；AgentTurn 新入口登记 hit.passage 并保留原始 ranking。旧入口签名不变。
 
-- [ ] 新工具结果仅暴露 query、passages；每条片段给出 id/title/text/rerank_score，来源留在证据与日志，其他阶段分数留在追踪。工具说明明确混合召回并重排。
-- [ ] 参数验证：空白 query、超长 query、额外字段、bool/小数 limit、超出 1..10 均拒绝。
-- [ ] 配置默认关闭；关闭时工具定义与旧版一致且零新资源加载；启用但依赖不可用时启动明确失败，不假装工具可用。
-- [ ] s2/s3/s4 注册新工具，继续共用既有预算；去重键使用 hybrid 命名空间，允许同一 query 在旧工具与新工具各执行一次。s4 跨轮保留这一记录。
-- [ ] 测试同一片段先经旧工具再经新工具返回，证据只有一份，新工具重排顺序/分数正确；模型收到工具结果与 tool_call_id 配对，重启检查点可恢复。
-- [ ] 执行 `<PY> -m pytest backend/tests/core/test_hybrid_tools.py backend/tests/core/test_config_api.py backend/tests/workflows -q`，核对数据集跳过项，不把 skip 当完整验收。
+- [x] 新工具结果仅暴露 query、passages（空结果或限制可附 notice）；每条片段给出 id/title/text/rerank_score/final_score，来源留在证据与日志，其他阶段分数留在追踪。final_score 对应排名修复后的融合排序，rerank_score 保留原始模型分数。工具说明明确混合召回并重排。
+- [x] 参数验证：空白 query、超长 query、额外字段、bool/小数 limit、超出 1..10 均拒绝。
+- [x] 配置默认关闭；关闭时工具定义与旧版一致且零新资源加载；启用但依赖不可用时启动明确失败，不假装工具可用。
+- [x] s2/s3/s4 注册新工具，继续共用既有预算；去重键使用 hybrid 命名空间，允许同一 query 在旧工具与新工具各执行一次。s4 跨轮保留这一记录。
+- [x] 测试同一片段先经旧工具再经新工具返回，证据只有一份，新工具重排顺序/分数正确；模型收到工具结果与 tool_call_id 配对，重启检查点可恢复。
+- [x] 执行新增工具/资源/阶段回归以及现有 core/workflows 测试；Windows 排除项、跳过项与实际命令见 `2026-10-27-tool-injection-verification.md`。未把缺少 fcntl 的配置 HTTP 文件计为通过。
 
 **通过标准：** 开关两种模式均有运行证据；旧工具契约与既有阶段预算保持；新工具可真实调用、引用可展开。**提交：** `feat: expose optional hybrid_search_documents tool`。
 

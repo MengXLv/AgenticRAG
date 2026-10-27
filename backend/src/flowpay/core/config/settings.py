@@ -54,6 +54,7 @@ class Settings:
     embedding: EmbeddingSettings | None = None
     sources_config: Path | None = None
     knowledge_collection_id: str | None = None
+    hybrid_reranking_config: Path | None = None
 
     # 保留复现所需的运行设置；认证环境变量的值不属于快照内容。
     def snapshot(self) -> JsonObject:
@@ -66,4 +67,7 @@ class Settings:
         value["data_dir"] = str(self.data_dir)
         value["dataset_path"] = str(self.dataset_path)
         value["sources_config"] = str(self.sources_config) if self.sources_config else None
+        value["hybrid_reranking_config"] = (
+            str(self.hybrid_reranking_config) if self.hybrid_reranking_config else None
+        )
         return value

@@ -10,6 +10,11 @@ from flowpay.core.execution.contracts import TurnInput, TurnResult
 from flowpay.core.execution.runtime import AgentRuntime
 from flowpay.core.execution.stage import StageCard
 from flowpay.core.json import JsonObject
+from flowpay.core.knowledge.hybrid_tools import (
+    HybridDocumentSearchArguments,
+    HybridDocumentSearchResult,
+    hybrid_document_search_tool,
+)
 from flowpay.core.knowledge.tools import (
     DocumentReadArguments,
     DocumentReadResult,
@@ -139,6 +144,19 @@ class S3Workflow:
             actions.append(ToolAction("search_documents", query, len(hits)))
             return DocumentSearchResult(query, hits, "未检索到片段。" if not hits else None)
 
+        async def hybrid_search_documents(
+            arguments: HybridDocumentSearchArguments,
+        ) -> HybridDocumentSearchResult:
+            """原始查询进入双路召回；与所有工具共用预算，单独记录查询去重键。"""
+            query = " ".join(arguments.query.split())
+            if refused := self.claim(agent, done, "hybrid", query):
+                return HybridDocumentSearchResult(query, [], refused)
+            result = await agent.search_hybrid(query, limit=arguments.limit)
+            actions.append(ToolAction("hybrid_search_documents", query, len(result.hits)))
+            return HybridDocumentSearchResult(
+                query, result.hits, "未检索到片段。" if not result.hits else None
+            )
+
         async def read_document(arguments: DocumentReadArguments) -> DocumentReadResult:
             """整篇读回一份文档。"""
             doc_id = arguments.doc_id
@@ -177,6 +195,7 @@ class S3Workflow:
 
         agent.offer(
             document_search_tool(search_documents),
+            *([hybrid_document_search_tool(hybrid_search_documents)] if runtime.hybrid else []),
             document_read_tool(read_document),
             # 取值封闭的字段（环境、区域、服务、各种状态）由策略声明，写进工具的
             # JSON Schema。模型因此填不出登记之外的值，不会拿到一个"问法不对"

@@ -59,6 +59,25 @@ dimensions / request_options），对不上直接报错，不会让检索悄悄�
 端口参与向量空间身份比较（主机名不参与，`127.0.0.1`、`host.docker.internal`、
 `ollama` 会被归一成同一个部署）。
 
+## 可选混合检索工具
+
+`hybrid_search_documents` 已接入 s2–s4，与原有 `search_documents`、`read_document`
+并存，共用阶段的工具预算。默认关闭；s1 仍使用原来的固定检索流程。
+
+在已能运行原检索的后端环境中，安装 `uv sync --extra reranking`，预先准备
+`backend/configs/reranking.toml` 固定版本的本地权重，然后取消
+`backend/configs/local.toml` 中 `hybrid_reranking_config = "reranking.toml"` 的注释并重启。
+也可设置 `FLOWPAY_HYBRID_RERANKING_CONFIG=reranking.toml`；路径相对主配置文件解析。
+该推理配置当前使用 CUDA/float16，需要可用的 NVIDIA GPU。
+默认 Docker 镜像未安装 reranking extra，也未分配 GPU，需准备对应运行环境后再启用。
+
+新工具执行语义/BM25 各 Top-50 → RRF Top-30 → 预训练 Cross-Encoder → 融合排序，
+默认返回 6 条，允许显式指定 1–10 条。模型与索引在启动时准备并跨轮复用；
+缺少权重、依赖、设备或集合时启动失败，聊天请求不下载模型、不现场训练。
+删除配置项及环境覆盖后重启即可关闭。
+
+验证范围及运行证据见 [工具接入验收记录](docs/superpowers/plans/2026-10-27-tool-injection-verification.md)。
+
 ## 常用命令
 
 ```
