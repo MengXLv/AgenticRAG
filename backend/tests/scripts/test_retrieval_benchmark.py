@@ -105,12 +105,17 @@ def test_measured_rounds_are_separate_from_quality_sample_size() -> None:
     case = replace(
         sample(),
         warm_timings_ms={name: [1.0, 2.0, 3.0] for name in ("dense", "bm25", "rrf", "hybrid")},
+        measured_rerank_weight=1.0,
     )
     report = analyze([case], rerank_limit=10)
     assert report["question_count"] == 1
     performance = require_object(report["performance"])
     assert require_object(performance["hybrid"])["measurement_count"] == 3
     assert require_object(performance["hybrid"])["warm_p95_ms"] == 3.0
+    with pytest.raises(ValueError, match="policy"):
+        analyze([replace(case, measured_rerank_weight=0.75)], rerank_limit=10)
+    with pytest.raises(ValueError, match="policy"):
+        analyze([replace(case, measured_rerank_weight=None)], rerank_limit=10)
     with pytest.raises(ValueError, match="all four"):
         analyze([replace(case, warm_timings_ms={"dense": [1.0, 2.0, 3.0]})], rerank_limit=10)
     with pytest.raises(ValueError, match="three"):

@@ -1,4 +1,4 @@
-"""在相同候选、相同模型分数和同一 K 预算下验证最终排序修复。"""
+"""重放历史融合修复；默认权重固定为历史 0.75，不代表线上策略。"""
 
 import argparse
 import hashlib
@@ -21,7 +21,6 @@ from flowpay.core.json import (
 from flowpay.core.knowledge.hybrid_contracts import RankedCandidate, RerankHit
 from flowpay.core.knowledge.ranking import (
     DEFAULT_LIMIT,
-    DEFAULT_RERANK_WEIGHT,
     rank_candidates,
 )
 from pydantic import TypeAdapter
@@ -65,7 +64,7 @@ def analyze(
     cases: list[EvaluationCase],
     scored_rows: list[JsonObject],
     *,
-    rerank_weight: float = DEFAULT_RERANK_WEIGHT,
+    rerank_weight: float = 0.75,
     limit: int = DEFAULT_LIMIT,
     lengths_by_query: dict[str, list[int]] | None = None,
 ) -> JsonObject:
@@ -152,7 +151,7 @@ def analyze(
                 statistics.mean(numeric) if numeric else None
             )
     return {
-        "policy": "normalized_score_blend",
+        "policy": "cross_encoder" if rerank_weight == 1 else "normalized_score_blend",
         "rerank_weight": rerank_weight,
         "k": limit,
         "summary": summary,

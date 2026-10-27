@@ -1,10 +1,10 @@
-"""最终排序保留召回先验，模型分数只占配置的权重。"""
+"""默认按 Cross-Encoder 原始分数排序；显式权重仅供历史策略对照。"""
 
 import math
 
 from .hybrid_contracts import HybridHit, HybridRanking, RankedCandidate, RerankHit
 
-DEFAULT_RERANK_WEIGHT = 0.75
+DEFAULT_RERANK_WEIGHT = 1.0
 DEFAULT_LIMIT = 6
 
 
@@ -27,9 +27,10 @@ def rank_candidates(
     *,
     rerank_weight: float = DEFAULT_RERANK_WEIGHT,
 ) -> list[HybridHit]:
-    """归一化 RRF 位次先验与 logits 后加权，返回完整候选供调用者按原 K 截取。
+    """默认按原始模型分数排序，返回完整候选供调用者按原 K 截取。
 
-    原始 RRF/模型分数均保留；final_score 是当前候选池内的排序值，不是概率。
+    原始 RRF/模型分数均保留；纯模型策略 final_score 等于 rerank_score，不是概率。
+    显式传入其他权重可重放历史融合策略，线上协调器固定使用纯模型策略。
     候选输入必须已按 RRF 排序，ranker 输出顺序可任意但下标必须完整且唯一。
     """
     validate_weight(rerank_weight)
@@ -56,12 +57,15 @@ def rank_candidates(
         ),
     )
     rerank_positions = {index: position + 1 for position, index in enumerate(rerank_order)}
-    priors = _normalize([1.0 / (61 + i) for i in range(len(candidates))])
-    normalized_scores = _normalize(scores)
-    final_scores = [
-        (1 - rerank_weight) * prior + rerank_weight * model
-        for prior, model in zip(priors, normalized_scores, strict=True)
-    ]
+    if rerank_weight == 1:
+        final_scores = scores
+    else:
+        priors = _normalize([1.0 / (61 + i) for i in range(len(candidates))])
+        normalized_scores = _normalize(scores)
+        final_scores = [
+            (1 - rerank_weight) * prior + rerank_weight * model
+            for prior, model in zip(priors, normalized_scores, strict=True)
+        ]
     hits: list[HybridHit] = []
     for index, row in enumerate(candidates):
         hits.append(

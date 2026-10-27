@@ -14,6 +14,8 @@
 
 ## Global Constraints
 
+执行调整（2026-10-27）：用户明确选择恢复“RRF 筛选候选后仅由 Cross-Encoder 排序”。线上不再混合 RRF 位次先验；历史 0.75 融合报告保留为对照。默认 K 仍为 6，其他预算与工具契约不变。当前验证见 `2026-10-27-cross-encoder-final-order-verification.md`。
+
 执行调整（2026-10-26）：用户要求跳过步骤 1，直接开始步骤 2。本轮仅实施 BM25；质量对照、冻结预算不作为本轮前置条件。步骤 2 的性能数值作为测量报告，不宣称通过尚未定义的 SLA。详见 `2026-10-26-bm25-verification.md`。
 
 - 工具名固定为 `hybrid_search_documents`；`search_documents`、`read_document` 的参数、返回语义和执行路径保持不变。

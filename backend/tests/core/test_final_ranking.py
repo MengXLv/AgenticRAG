@@ -1,4 +1,4 @@
-"""最终排序同时保留 RRF 先验与模型分数，不扩大 Top-K 预算。"""
+"""默认由模型分数决定最终排序；显式权重仅用于历史策略重放。"""
 
 import math
 from dataclasses import replace
@@ -17,6 +17,19 @@ def candidates() -> list[RankedCandidate]:
     return [RankedCandidate(passage(name, name)) for name in "ABC"]
 
 
+def test_default_ranking_uses_only_raw_cross_encoder_scores() -> None:
+    source = list(reversed(candidates()))
+    hits = rank_candidates(source, [RerankHit(0, -7), RerankHit(1, -6.9), RerankHit(2, -9)])
+    assert [hit.passage.source.doc_id for hit in hits] == ["B", "C", "A"]
+    assert all(hit.ranking.final_score == hit.ranking.rerank_score for hit in hits)
+
+
+def test_default_tied_model_scores_do_not_fall_back_to_rrf_order() -> None:
+    source = list(reversed(candidates()))
+    hits = rank_candidates(source, [RerankHit(i, 1) for i in range(3)])
+    assert [hit.passage.source.doc_id for hit in hits] == ["A", "B", "C"]
+
+
 def test_normalized_score_blend_preserves_evidence_and_separate_scores() -> None:
     source = candidates()
     hits = rank_candidates(
@@ -31,7 +44,7 @@ def test_normalized_score_blend_preserves_evidence_and_separate_scores() -> None
     assert all(h.passage.score == 0 for h in hits)
 
 
-def test_equal_model_scores_preserve_rrf_order() -> None:
+def test_equal_model_scores_use_stable_document_order() -> None:
     hits = rank_candidates(candidates(), [RerankHit(i, 1) for i in range(3)])
     assert [h.passage.source.doc_id for h in hits] == ["A", "B", "C"]
 
@@ -76,7 +89,7 @@ def test_empty_pool_and_invalid_mapping() -> None:
         rank_candidates(candidates(), [RerankHit(0, 1)] * 3)
 
 
-def test_recorded_model_regressions_keep_both_critical_passages_in_default_budget() -> None:
+def test_recorded_model_regressions_remain_reproducible_with_explicit_legacy_weight() -> None:
     raw = Path(__file__).with_name("fixtures") / "ranking_regressions.json"
     for value in require_list(parse_json(raw.read_text(encoding="utf-8"))):
         fixture = require_object(value)
@@ -95,4 +108,6 @@ def test_recorded_model_regressions_keep_both_critical_passages_in_default_budge
         assert fixture["required_id"] not in [
             h.passage.id for h in rank_candidates(source, scores, rerank_weight=1)[:5]
         ]
-        assert fixture["required_id"] in [h.passage.id for h in rank_candidates(source, scores)[:6]]
+        assert fixture["required_id"] in [
+            h.passage.id for h in rank_candidates(source, scores, rerank_weight=0.75)[:6]
+        ]

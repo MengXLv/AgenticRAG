@@ -74,7 +74,6 @@ def make_client(
         retrieval_input,
         rerank_limit=rerank_limit,
         timeout_seconds=timeout_seconds,
-        rerank_weight=1.0,
     ), store
 
 
@@ -132,7 +131,9 @@ async def test_empty_candidates_skip_reranker(tmp_path: Path) -> None:
     assert not rerank.calls
 
 
-async def test_default_client_blends_scores_and_keeps_requested_limit(tmp_path: Path) -> None:
+async def test_default_client_uses_cross_encoder_scores_and_keeps_requested_limit(
+    tmp_path: Path,
+) -> None:
     source = [passage(name, name) for name in "ABC"]
     store = EventStore(tmp_path / "default.sqlite")
     client = HybridKnowledgeClient(
@@ -144,8 +145,9 @@ async def test_default_client_blends_scores_and_keeps_requested_limit(tmp_path: 
     )
     result = await client.search("ready", "query", limit=2)
     assert [h.passage.source.doc_id for h in result.hits] == ["B", "C"]
-    assert store.read("s")[0]["payload"]["rerank_weight"] == 0.75
-    assert result.hits[0].ranking.final_score is not None
+    assert store.read("s")[0]["payload"]["final_ranking"] == "cross_encoder"
+    assert "rerank_weight" not in store.read("s")[0]["payload"]
+    assert result.hits[0].ranking.final_score == result.hits[0].ranking.rerank_score
 
 
 async def test_new_pipeline_default_is_six_but_explicit_five_is_respected(tmp_path: Path) -> None:

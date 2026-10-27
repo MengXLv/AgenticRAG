@@ -5,18 +5,26 @@ from pathlib import Path
 
 import pytest
 
+from flowpay.core.agent.trace import Tracer
 from flowpay.core.config import Settings
 from flowpay.core.data_sources import DataSources
 from flowpay.core.event_log import EventStore
 from flowpay.core.execution.manager import SessionManager
 from flowpay.core.execution.resources import RuntimeResources
 from flowpay.core.json import JsonObject, parse_json, require_list, require_object
-from flowpay.core.knowledge.hybrid_contracts import HybridHit, HybridRanking, HybridSearchResult
+from flowpay.core.knowledge.hybrid import HybridKnowledgeClient
+from flowpay.core.knowledge.hybrid_contracts import (
+    HybridHit,
+    HybridRanking,
+    HybridSearchResult,
+    RerankHit,
+)
 from flowpay.core.llm.embedding.ollama import retrieval_input
 from flowpay.dataset import dataset_path, snapshot_ready
 from flowpay.router import create_stage
+from tests.core.test_hybrid_knowledge import Dense, Lexical, Rerank
 
-from .fixtures import Model, Search, completion, grounded, hit, search_call
+from .fixtures import Model, Search, completion, grounded, hit, other_hit, search_call
 
 
 def call(identifier: str, query: str) -> JsonObject:
@@ -39,6 +47,52 @@ class Hybrid:
         return HybridSearchResult(
             [HybridHit(hit(), HybridRanking(0.8, 1, 3.0, 1, 0.03, -7.0, 1, 1, 0.95))]
         )
+
+
+async def test_production_coordinator_cross_encoder_order_reaches_tool_payload(
+    tmp_path: Path,
+) -> None:
+    model, old = Model(), Search()
+    rows = [other_hit(f"doc:{name}#c001", name) for name in "CBA"]
+    settings = Settings(tmp_path, tmp_path, workflow="s2", knowledge_collection_id="fixture")
+
+    def hybrid(tracer: Tracer) -> HybridKnowledgeClient:
+        return HybridKnowledgeClient(
+            Dense(rows),
+            Lexical([]),
+            Rerank([RerankHit(0, -7), RerankHit(1, -6.9), RerankHit(2, -9)]),
+            tracer,
+            retrieval_input,
+        )
+
+    resources = RuntimeResources(settings, retriever=old.for_run, hybrid_retriever=hybrid)
+    manager = SessionManager(
+        EventStore(tmp_path / "e.sqlite"),
+        create_stage("s2", model, retrieval_input),
+        settings,
+        resources,
+    )
+    model.responses = [completion(calls=[call("new", "HTTP 410")]), grounded()]
+    try:
+        sid = (await manager.create_session())["id"]
+        await manager.submit_message(sid, "first", "HTTP 410")
+        await manager.tasks[sid]
+        view = await manager.get_session(sid)
+        assert view["status"] == "completed"
+        messages = [
+            require_object(m)
+            for m in require_list(view["state"]["messages"])
+            if require_object(m)["role"] == "tool"
+        ]
+        payload = require_object(parse_json(str(messages[0]["content"])))
+        passages = [require_object(p) for p in require_list(payload["passages"])]
+        assert [p["id"] for p in passages] == ["doc:B#c001", "doc:C#c001", "doc:A#c001"]
+        assert [p["final_score"] for p in passages] == [-6.9, -7.0, -9.0]
+        assert all(p["final_score"] == p["rerank_score"] for p in passages)
+        assert len(view["messages"][-1].get("evidence", [])) == 3
+    finally:
+        await manager.shutdown()
+        resources.close()
 
 
 @pytest.mark.parametrize("stage", ["s2", "s3", "s4"])

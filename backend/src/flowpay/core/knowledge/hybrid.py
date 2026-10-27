@@ -21,7 +21,7 @@ from .hybrid_contracts import (
     RankedCandidate,
     Reranker,
 )
-from .ranking import DEFAULT_LIMIT, DEFAULT_RERANK_WEIGHT, rank_candidates, validate_weight
+from .ranking import DEFAULT_LIMIT, rank_candidates
 
 
 async def _drain[T](task: asyncio.Future[T]) -> None:
@@ -65,7 +65,6 @@ class HybridKnowledgeClient:
         rerank_limit: int = 30,
         rank_constant: int = 60,
         timeout_seconds: float = 30,
-        rerank_weight: float = DEFAULT_RERANK_WEIGHT,
     ) -> None:
         if type(recall_limit) is not int or not 1 <= recall_limit <= 100:
             raise ValueError("recall_limit must be 1..100")
@@ -79,8 +78,6 @@ class HybridKnowledgeClient:
             or timeout_seconds <= 0
         ):
             raise ValueError("timeout_seconds must be finite and positive")
-        validate_weight(rerank_weight)
-        self.rerank_weight: float = rerank_weight
         self.dense: DenseRetriever = (
             _JoinedKnowledgeClient(dense.store, dense.embeddings, dense.tracer)
             if isinstance(dense, KnowledgeClient)
@@ -109,8 +106,7 @@ class HybridKnowledgeClient:
                 "rerank_limit": self.rerank_limit,
                 "rank_constant": self.rank_constant,
                 "timeout_seconds": self.timeout_seconds,
-                "final_ranking": "normalized_score_blend",
-                "rerank_weight": self.rerank_weight,
+                "final_ranking": "cross_encoder",
             },
             call_id,
         )
@@ -231,4 +227,4 @@ class HybridKnowledgeClient:
 
     async def _rerank(self, query: str, candidates: list[RankedCandidate]) -> list[HybridHit]:
         ranks = await self.reranker.rank(query, [row.passage for row in candidates])
-        return rank_candidates(candidates, ranks, rerank_weight=self.rerank_weight)
+        return rank_candidates(candidates, ranks, rerank_weight=1.0)
