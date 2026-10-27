@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from flowpay.core.json import JsonObject, require_object, require_text
+from flowpay.core.prompts import prompt
 from flowpay.core.tools import Tool
 
 from .reader import SourceResult
@@ -75,7 +76,7 @@ def sql_tool(
             return {
                 "rows": [],
                 "truncated": False,
-                "notice": f"除账户与环境外至少再给一个条件：{'、'.join(spec.filters)}。",
+                "notice": prompt("tools", "sql_filter_required", filters="、".join(spec.filters)),
             }
         return rows_for_model(await query(spec.source, scope, filters))
 
@@ -92,7 +93,11 @@ def log_tool(
             k: require_text(v) for k, v in arguments.items() if k in spec.filters
         }
         if not filters:
-            return {"rows": [], "truncated": False, "notice": "至少给出一个过滤条件。"}
+            return {
+                "rows": [],
+                "truncated": False,
+                "notice": prompt("tools", "log_filter_required"),
+            }
         window = {k: require_text(arguments[k]) for k in ("start", "end") if k in arguments}
         return log_rows_for_model(await query(spec.source, filters=filters, **window))
 
@@ -100,7 +105,7 @@ def log_tool(
     return Tool(spec.name, spec.description, schema(spec.filters[:1], optional, values), run)
 
 
-WINDOW_HINT = "ISO 8601 时间戳，必须带时区，例如 2026-08-19T11:00:00Z"
+WINDOW_HINT = prompt("tools", "window_hint")
 
 
 def schema(

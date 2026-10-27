@@ -1,0 +1,5 @@
+query_instruction = "Given a technical support question, retrieve relevant passages that answer it."
+
+retrieval_input = """
+Instruct: {instruction}
+Query: {question}"""

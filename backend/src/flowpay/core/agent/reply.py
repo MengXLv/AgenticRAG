@@ -12,6 +12,7 @@ from openai.types.chat import (
 
 from flowpay.core.json import JsonObject
 from flowpay.core.llm.chat.messages import ModelOutputError, answer_text, assistant_message
+from flowpay.core.prompts import prompt
 
 
 @dataclass(frozen=True)
@@ -97,4 +98,7 @@ def correction_messages(
         if message is not None and message.content and not message.tool_calls
         else []
     )
-    return [*draft, {"role": "system", "content": f"上次输出无法使用：{error} 请纠正后重试。"}]
+    return [
+        *draft,
+        {"role": "system", "content": prompt("agent", "output_correction", error=str(error))},
+    ]

@@ -19,6 +19,7 @@ from flowpay.core.knowledge.ranking import DEFAULT_LIMIT
 from flowpay.core.llm.chat import ChatModel
 from flowpay.core.llm.chat.client import ChatClient
 from flowpay.core.llm.chat.messages import MessageLog, ModelOutputError
+from flowpay.core.prompts import prompt
 from flowpay.core.tools import Tool, Toolbox, ToolInputError
 
 from .budget import Budget, StopReason
@@ -28,7 +29,7 @@ from .reply import Action, Observation, Reply, correction_messages, read_reply
 if TYPE_CHECKING:
     from flowpay.core.execution.runtime import AgentRuntime
 
-CLOSING = "本轮工具预算已关闭，请根据已有信息直接回答并说明限制。"
+CLOSING = prompt("agent", "closing")
 
 # 业务记录编号形如 pay_bg_001_0003、req_bm_030_01：小写前缀加下划线，且带数字。
 # 用它区分"真的引用了一条记录"和"提到了 FP-4021 这类错误码或字段名"。
@@ -53,12 +54,6 @@ def given_record_ids(messages: MessageLog) -> list[str]:
         if message["role"] == "user" and isinstance(content, str):
             found.extend(record_ids(content))
     return found
-
-
-DISPUTE = (
-    "回答里出现了这些编号，但本轮没有任何工具返回过它们：{names}。"
-    "请改写回答：只引用工具实际返回的记录，或说明这一项无法确认。"
-)
 
 
 @dataclass
@@ -181,7 +176,9 @@ class AgentTurn:
         if not invented or not self.budget.may_think() or self.budget.must_answer():
             return False
         await self.runtime.tracer.emit("answer.disputed", {"identifiers": invented}, reply.call_id)
-        self.messages.add_system_message(DISPUTE.format(names="、".join(invented)))
+        self.messages.add_system_message(
+            prompt("agent", "citation_dispute", names="、".join(invented))
+        )
         return True
 
     async def search(self, text: str, limit: int = 5) -> list[Passage]:

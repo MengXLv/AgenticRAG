@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from flowpay.core.json import JsonObject
 from flowpay.core.knowledge.contracts import Passage, for_model
+from flowpay.core.prompts import prompt
 from flowpay.core.tools import Tool
 from flowpay.core.tools.contracts import ToolInputError
 
@@ -53,7 +54,7 @@ def document_search_tool(handler: DocumentSearchHandler) -> Tool:
 
     return Tool(
         name="search_documents",
-        description="检索本轮绑定的文档集合，返回原文片段与引用 ID。",
+        description=prompt("tools", "search_documents_description"),
         parameters=DocumentSearchArguments.model_json_schema(),
         execute=search,
     )
@@ -67,10 +68,7 @@ class DocumentReadArguments(BaseModel):
         min_length=1,
         max_length=64,
         pattern=r"^[A-Za-z0-9._-]+$",
-        description=(
-            "文档编号本身，例如 KB-TS-012。"
-            "从片段编号 doc:KB-TS-012#c001 取用时，去掉 doc: 前缀和 #c001 后缀。"
-        ),
+        description=(prompt("tools", "document_id_hint")),
     )
 
 
@@ -103,10 +101,7 @@ def document_read_tool(handler: DocumentReadHandler) -> Tool:
 
     return Tool(
         name="read_document",
-        description=(
-            "按文档编号整篇读回它的全部片段，按顺序排列。"
-            "已经知道某份文档相关、但检索只给出零散片段时使用。"
-        ),
+        description=(prompt("tools", "read_document_description")),
         parameters=DocumentReadArguments.model_json_schema(),
         execute=read,
     )

@@ -7,6 +7,7 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from flowpay.core.json import JsonObject
+from flowpay.core.prompts import prompt
 from flowpay.core.tools import Tool, ToolInputError
 
 from .hybrid_contracts import HybridHit
@@ -57,11 +58,7 @@ def hybrid_document_search_tool(handler: HybridDocumentSearchHandler) -> Tool:
 
     return Tool(
         name="hybrid_search_documents",
-        description=(
-            "结合语义与关键词检索文档，融合并重排后返回原文片段和引用 ID。"
-            "适合错误码、字段名、版本号或需要同时匹配多项条件的问题。"
-            "默认返回 6 条；分数仅用于本次结果排序，不是答案置信度。"
-        ),
+        description=(prompt("tools", "hybrid_search_documents_description")),
         parameters=HybridDocumentSearchArguments.model_json_schema(),
         execute=search,
     )

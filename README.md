@@ -59,6 +59,12 @@ dimensions / request_options），对不上直接报错，不会让检索悄悄�
 端口参与向量空间身份比较（主机名不参与，`127.0.0.1`、`host.docker.internal`、
 `ollama` 会被归一成同一个部署）。
 
+## 提示词维护
+
+各阶段系统提示词、动态上下文、工具说明与公共纠错指令已独立到
+[`backend/src/flowpay/core/prompts/`](backend/src/flowpay/core/prompts/README.md) 的 TOML 文件。
+修改后重启后端；新建会话使用更新后的系统提示词。
+
 ## 可选混合检索工具
 
 `hybrid_search_documents` 已接入 s2–s4，与原有 `search_documents`、`read_document`

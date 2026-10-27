@@ -13,8 +13,9 @@ from flowpay.core.json import (
     require_text,
 )
 from flowpay.core.llm.embedding import EmbeddingSettings
+from flowpay.core.prompts import prompt
 
-QUERY_INSTRUCTION = "Given a technical support question, retrieve relevant passages that answer it."
+QUERY_INSTRUCTION = prompt("embedding", "query_instruction")
 
 
 @dataclass(frozen=True)
@@ -52,4 +53,4 @@ async def ollama_identity(settings: EmbeddingSettings) -> OllamaDeployment:
 
 def retrieval_input(question: str) -> str:
     """只在查询侧加入指令，实际输入仍由 EmbeddingClient 原样记录。"""
-    return f"Instruct: {QUERY_INSTRUCTION}\nQuery: {question}"
+    return prompt("embedding", "retrieval_input", instruction=QUERY_INSTRUCTION, question=question)
