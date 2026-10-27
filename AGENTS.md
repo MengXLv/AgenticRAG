@@ -1,7 +1,7 @@
 # 项目编码约定
 
-- 每个课程阶段使用 workflows/sN.py 独立文件，包含本阶段编排和专有状态；提示词文本独立维护于 core/prompts/sN.toml，通过统一入口加载。不继承或调用其他阶段的 run，只注册已实现阶段。
-- workflows 只展示阶段编排、手写 Agent Loop、提示词选择与参数填充、业务决策，通过类型明确的能力接口调用下层。系统提示词、上下文模板和工具指令写入 core/prompts 对应文本资源，不在流程代码内嵌长文本。
+- 每个课程阶段使用 workflows/sN.py 独立文件，包含本阶段编排和专有状态；阶段系统提示词和上下文模板直接写在对应的 workflows/sN.py 中，便于对照流程学习。不继承或调用其他阶段的 run，只注册已实现阶段。
+- workflows 只展示阶段编排、手写 Agent Loop、提示词选择与参数填充、业务决策，通过类型明确的能力接口调用下层。阶段系统提示词在文件顶部声明，上下文模板和阶段反馈在使用位置直接展示；公共工具指令、纠错和嵌入模板保留于 core/prompts。
 - workflows 不创建 SDK/数据库客户端，不实现 HTTP/SSE/SQL/文件读取、追踪落库、模型原生协议解析或样例工具。不得把整个教学循环藏进下层实现。
 - 通用能力及其实现放 core；发布文档导入、模拟服务与验收放 scripts；具体对象装配放 flowpay/bootstrap.py，阶段注册与选择放 flowpay/router.py。core 不依赖 workflows、router、bootstrap 或 scripts。
 - 公共方法声明清楚输入和返回类型，动作使用有意义的动词。已知结构不要退回 dict[str, Any]；供应商扩展和阶段状态可保留 JSON 边界。

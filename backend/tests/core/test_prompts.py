@@ -16,7 +16,7 @@ def test_resources_are_loaded_independently_of_working_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    assert "FlowPay" in prompt("s1", "system")
+    assert "检索" in prompt("tools", "no_search_results")
 
 
 def test_template_preserves_inserted_braces_and_unicode() -> None:
@@ -36,7 +36,7 @@ def test_unknown_group_and_key_are_explicit_errors() -> None:
     with pytest.raises(ValueError, match="group"):
         prompt("../s1", "system")
     with pytest.raises(ValueError, match="key"):
-        prompt("s1", "missing")
+        prompt("agent", "missing")
 
 
 def test_every_packaged_template_can_be_rendered() -> None:

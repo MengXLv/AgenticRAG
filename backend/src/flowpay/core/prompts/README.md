@@ -1,13 +1,10 @@
 # 提示词资源
 
-模型指令与流程代码分别维护。修改相应 TOML 文本，无需修改工作流实现。
+阶段系统提示词和动态上下文位于 `../../workflows/s1.py` 至 `s4.py`，与执行流程一起阅读和修改。
+本目录只维护公共工具说明、纠错指令和嵌入模板。
 
 | 文件 | 内容 |
 | --- | --- |
-| `s1.toml` | 朴素 RAG 系统指令、资料与历史对话模板 |
-| `s2.toml` | 自主检索系统指令 |
-| `s3.toml` | 多源调查系统指令 |
-| `s4.toml` | 多轮协作系统指令、条件变更与追问反馈 |
 | `agent.toml` | 预算收尾、引用纠正、输出纠正指令 |
 | `tools.toml` | 工具说明、参数说明、空结果与限制反馈 |
 | `embedding.toml` | Qwen 查询指令与输入模板 |
@@ -17,7 +14,6 @@
 ```python
 from flowpay.core.prompts import prompt
 
-system = prompt("s2", "system")
 feedback = prompt("agent", "output_correction", error=str(error))
 ```
 
@@ -30,4 +26,4 @@ feedback = prompt("agent", "output_correction", error=str(error))
 检查点中的系统消息。普通 UI 文案、字段枚举、预算数值和错误类型仍由代码管理。
 
 嵌入指令也会影响查询向量；修改 `embedding.toml` 属于检索行为变更，应重新评测。
-本次迁移保留原文本和空白，没有修改查询输入或模型参数。
+阶段提示词迁回代码时保留原文本和空白，没有修改查询输入或模型参数。

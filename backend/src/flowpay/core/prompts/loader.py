@@ -7,7 +7,7 @@ from string import Formatter
 
 from flowpay.core.json import require_object, require_text
 
-GROUPS = frozenset({"s1", "s2", "s3", "s4", "agent", "tools", "embedding"})
+GROUPS = frozenset({"agent", "tools", "embedding"})
 
 
 @lru_cache(maxsize=len(GROUPS))

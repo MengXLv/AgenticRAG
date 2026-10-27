@@ -68,7 +68,8 @@ dimensions / request_options），对不上直接报错，不会让检索悄悄�
 
 ## 提示词维护
 
-各阶段系统提示词、动态上下文、工具说明与公共纠错指令已独立到
+各阶段系统提示词和动态上下文直接写在 `backend/src/flowpay/workflows/s1.py` 至 `s4.py`，
+可对照提示词阅读执行流程。公共工具说明、纠错指令和嵌入模板保留在
 [`backend/src/flowpay/core/prompts/`](backend/src/flowpay/core/prompts/README.md) 的 TOML 文件。
 修改后重启后端；新建会话使用更新后的系统提示词。
 
